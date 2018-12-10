@@ -1,0 +1,130 @@
+<!doctype html>
+<html>
+  <body>
+    <h1>Download files using the WebTorrent protocol (BitTorrent over WebRTC).</h1>
+
+    <form>
+      <label for="torrentId">Download from a magnet link: </label>
+      <input name="torrentId", placeholder="magnet:" value="magnet:?xt=urn:btih:08ada5a7a6183aae1e09d831df6748d566095a10&dn=Sintel&tr=udp%3A%2F%2Fexplodie.org%3A6969&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Ftracker.empire-js.us%3A1337&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337&tr=wss%3A%2F%2Ftracker.btorrent.xyz&tr=wss%3A%2F%2Ftracker.fastcast.nz&tr=wss%3A%2F%2Ftracker.openwebtorrent.com&ws=https%3A%2F%2Fwebtorrent.io%2Ftorrents%2F&xs=https%3A%2F%2Fwebtorrent.io%2Ftorrents%2Fsintel.torrent">
+      <button type="submit">Download</button>
+    </form>
+
+    <h2>Log</h2>
+    <div class="log"></div>
+
+    <!-- Include the latest version of WebTorrent -->
+    <script src="https://cdn.jsdelivr.net/webtorrent/latest/webtorrent.min.js"></script>
+
+    <script>
+      var peerConnectionConfig = {
+          iceServers: [
+        {urls: ['stun:stun.l.google.com:19302'] },
+        {urls:['stun:66.181.166.183:3478']},
+        {urls:['stun:stun01.sipphone.com']},
+        {urls:['stun:stun.ekiga.net']},
+        {urls:['stun:stun.fwdnet.net']},
+        {urls:['stun:stun.ideasip.com']},
+        {urls:['stun:stun.iptel.org']},
+        {urls:['stun:stun.schlund.de']},
+        {urls:['stun:stun1.l.google.com:19302']},
+        {urls:['stun:stun2.l.google.com:19302']},
+        {urls:['stun:stun.softjoys.com']},
+        {urls:['stun:stun.voiparound.com']},
+        {urls:['stun:stun.voipbuster.com']},
+        {urls:['stun:stun.voipstunt.com']},
+        {urls:['stun:stun.voxgratia.org']},
+        {urls:['stun:stun.xten.com']},  //stun:s1.taraba.net   stun:s2.taraba.net
+        { urls: ['stun:66.181.166.183:3478']  },
+          { urls: 'turn:turn.anyfirewall.com:443?transport=tcp',
+            username: 'webrtc', credential: 'webrtc'
+          }, {
+            urls: 'turn:66.181.166.183:3478?transport=tcp',
+            username: 'test', credential: 'test'
+          }, {
+            urls: 'turn:66.181.166.183:3478?transport=udp',
+            username: 'test', credential: 'test'
+          } ], "iceTransportPolicy":"all","iceCandidatePoolSize":"0"
+        };
+        var client = new WebTorrent({  tracker: {  rtcConfig: peerConnectionConfig   }  });
+
+        if (!WebTorrent.WEBRTC_SUPPORT) {
+          console.log('WEBRTC supported'); // WebRTC is supported
+        } else {
+          console.log('no WEBRTC ')
+        }
+
+        client.on('error', function (err) {
+            console.error('ERROR: ' + err.message)
+        })
+
+      document.querySelector('form').addEventListener('submit', function (e) {
+        e.preventDefault() // Prevent page refresh
+
+        var torrentId = document.querySelector('form input[name=torrentId]').value
+        log('Adding ' + torrentId)
+        client.add(torrentId, onTorrent)
+      })
+
+	  //var buf = new Buffer('TTTTTTEEEESSSSTTTTTTT A = file content');
+      //buf.name = 'testA.json';
+	  //client.seed(buf, function (torrent) {
+	  var cleanScript = {
+		'type': 'script',
+		'api_key': 'sadasdsadsadsa3424343424'
+	  };
+	  var jsonse = JSON.stringify(cleanScript);
+	  var blob = new Blob([jsonse], {type: "application/json"});
+
+	  function blobToFile(theBlob, fileName){
+		//A Blob() is almost a File() - it's just missing the two properties below which we will add
+		theBlob.lastModifiedDate = new Date();
+		theBlob.name = fileName;
+		return theBlob;
+	  }
+
+      var file =  blobToFile(blob, 'test.txt'); //new File([blob], "test.json", "application/json");
+      client.seed(file, function (torrent) {
+		console.log('Client is seeding ' + torrent.magnetURI)
+	  });
+
+      function onTorrent (torrent) {
+        log('Got torrent metadata!')
+        log(
+          'Torrent info hash: ' + torrent.infoHash + ' ' +
+          '<a href="' + torrent.magnetURI + '" target="_blank">[Magnet URI]</a> ' +
+          '<a href="' + torrent.torrentFileBlobURL + '" target="_blank" download="' + torrent.name + '.torrent">[Download .torrent]</a>'
+        )
+
+        // Print out progress every 5 seconds
+        var interval = setInterval(function () {
+          log('Progress: ' + (torrent.progress * 100).toFixed(1) + '%')
+        }, 5000)
+
+        torrent.on('done', function () {
+          log('Progress: 100%')
+          clearInterval(interval)
+        })
+
+        // Render all files into to the page
+        torrent.files.forEach(function (file) {
+          file.appendTo('.log')
+          log('(Blob URLs only work if the file is loaded from a server. "http//localhost" works. "file://" does not.)')
+          file.getBlobURL(function (err, url) {
+            if (err) return log(err.message)
+            log('File done.')
+            log('<a href="' + url + '">Download full file: ' + file.name + '</a>')
+          })
+        })
+      }
+
+      function log (str) {
+        var p = document.createElement('p')
+        p.innerHTML = str
+        document.querySelector('.log').appendChild(p)
+      }
+
+    </script>
+  </body>
+</html>
+
+
